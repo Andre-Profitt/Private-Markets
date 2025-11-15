@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Deal {
+  id              String      @id @default(uuid())
+  companyId       String      @map("company_id")
+  securityClassId String      @map("security_class_id")
+  
+  name            String
+  description     String      @db.Text
+  dealType        DealType    @map("deal_type")
+  status          DealStatus  @default(DRAFT)
+  
+  targetAmount    Decimal     @map("target_amount") @db.Decimal(18, 2)
+  minInvestment   Decimal     @map("min_investment") @db.Decimal(18, 2)
+  maxInvestment   Decimal?    @map("max_investment") @db.Decimal(18, 2)
+  pricePerShare   Decimal     @map("price_per_share") @db.Decimal(18, 8)
+  
+  raisedAmount    Decimal     @default(0) @map("raised_amount") @db.Decimal(18, 2)
+  investorCount   Int         @default(0) @map("investor_count")
+  
+  startDate       DateTime    @map("start_date")
+  endDate         DateTime    @map("end_date")
+  
+  terms           Json?
+  metadata        Json?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  
+  investments     Investment[]
+  
+  @@map("deals")
+  @@index([companyId])
+  @@index([status])
+}
+
+enum DealType {
+  EQUITY
+  CONVERTIBLE_NOTE
+  SAFE
+  REVENUE_SHARE
+}
+
+enum DealStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  CANCELLED
+  FULLY_SUBSCRIBED
+}
+
+model Investment {
+  id            String          @id @default(uuid())
+  dealId        String          @map("deal_id")
+  userId        String          @map("user_id")
+  
+  amount        Decimal         @db.Decimal(18, 2)
+  shares        Decimal         @db.Decimal(18, 4)
+  status        InvestmentStatus @default(PENDING)
+  
+  committedAt   DateTime        @default(now()) @map("committed_at")
+  completedAt   DateTime?       @map("completed_at")
+  
+  deal          Deal            @relation(fields: [dealId], references: [id])
+  
+  @@map("investments")
+  @@index([dealId])
+  @@index([userId])
+}
+
+enum InvestmentStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  action      String
+  userId      String?  @map("user_id")
+  timestamp   DateTime @default(now())
+  
+  @@map("audit_logs")
+}

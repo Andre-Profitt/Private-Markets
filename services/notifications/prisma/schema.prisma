@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Notification {
+  id            String            @id @default(uuid())
+  userId        String            @map("user_id")
+  
+  type          NotificationType
+  channel       NotificationChannel
+  
+  title         String
+  message       String            @db.Text
+  data          Json?
+  
+  status        NotificationStatus @default(PENDING)
+  readAt        DateTime?         @map("read_at")
+  sentAt        DateTime?         @map("sent_at")
+  
+  createdAt     DateTime          @default(now()) @map("created_at")
+  
+  @@map("notifications")
+  @@index([userId])
+  @@index([status])
+}
+
+enum NotificationType {
+  KYC_UPDATE
+  INVESTMENT
+  PAYMENT
+  DEAL
+  DOCUMENT
+  SYSTEM
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+model NotificationPreference {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  
+  emailEnabled   Boolean @default(true) @map("email_enabled")
+  smsEnabled     Boolean @default(false) @map("sms_enabled")
+  pushEnabled    Boolean @default(true) @map("push_enabled")
+  
+  @@map("notification_preferences")
+  @@unique([userId])
+}

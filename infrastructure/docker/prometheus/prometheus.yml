@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'services'
+    static_configs:
+      - targets: 
+        - 'identity:3001'
+        - 'profiles:3002'
+        - 'companies:3003'
+        - 'holdings:3004'
+        - 'marketplace:3005'
+        - 'deals:3006'
+        - 'documents:3007'
+        - 'payments:3008'
+        - 'pricing:3009'
+        - 'indexing:3010'
+        - 'notifications:3011'
+        - 'admin:3012'

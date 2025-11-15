@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique @map("user_id")
+  dateOfBirth     DateTime? @map("date_of_birth")
+  phoneNumber     String?   @map("phone_number")
+  nationality     String?
+  taxId           String?   @map("tax_id")
+  
+  // Address
+  street          String?
+  city            String?
+  state           String?
+  zipCode         String?   @map("zip_code")
+  country         String?
+  
+  // Profile metadata
+  profileComplete Boolean   @default(false) @map("profile_complete")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  kycChecks       KycCheck[]
+  accreditation   AccreditationStatus?
+  documents       ProfileDocument[]
+
+  @@map("user_profiles")
+  @@index([userId])
+}
+
+model KycCheck {
+  id              String      @id @default(uuid())
+  profileId       String      @map("profile_id")
+  provider        String      // e.g., "MOCK", "ONFIDO", "JUMIO"
+  checkType       KycCheckType @map("check_type")
+  status          KycStatus
+  referenceId     String?     @map("reference_id")
+  
+  // Check results
+  result          Json?       // Provider-specific result data
+  riskScore       Int?        @map("risk_score")
+  notes           String?
+  
+  // Verification details
+  verifiedBy      String?     @map("verified_by")
+  verifiedAt      DateTime?   @map("verified_at")
+  expiresAt       DateTime?   @map("expires_at")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  profile         UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_checks")
+  @@index([profileId])
+  @@index([status])
+  @@index([provider])
+}
+
+model AccreditationStatus {
+  id              String              @id @default(uuid())
+  profileId       String              @unique @map("profile_id")
+  status          AccreditationStatusType @default(NOT_VERIFIED)
+  
+  // Verification method
+  verificationType AccreditationType? @map("verification_type")
+  annualIncome    Decimal?           @map("annual_income") @db.Decimal(15, 2)
+  netWorth        Decimal?           @map("net_worth") @db.Decimal(15, 2)
+  
+  // Professional credentials
+  isQualifiedPurchaser Boolean        @default(false) @map("is_qualified_purchaser")
+  licenses        String[]           // e.g., ["Series 7", "Series 65"]
+  
+  // Verification tracking
+  verifiedBy      String?            @map("verified_by")
+  verifiedAt      DateTime?          @map("verified_at")
+  expiresAt       DateTime?          @map("expires_at")
+  lastReviewedAt  DateTime?          @map("last_reviewed_at")
+  
+  notes           String?
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  profile         UserProfile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("accreditation_statuses")
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model ProfileDocument {
+  id              String         @id @default(uuid())
+  profileId       String         @map("profile_id")
+  documentType    DocumentType   @map("document_type")
+  fileName        String         @map("file_name")
+  fileUrl         String         @map("file_url")
+  fileSize        Int            @map("file_size")
+  mimeType        String         @map("mime_type")
+  
+  // Verification
+  verified        Boolean        @default(false)
+  verifiedBy      String?        @map("verified_by")
+  verifiedAt      DateTime?      @map("verified_at")
+  
+  expiresAt       DateTime?      @map("expires_at")
+  uploadedAt      DateTime       @default(now()) @map("uploaded_at")
+  
+  profile         UserProfile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_documents")
+  @@index([profileId])
+  @@index([documentType])
+}
+
+enum KycCheckType {
+  IDENTITY_VERIFICATION
+  DOCUMENT_VERIFICATION
+  ADDRESS_VERIFICATION
+  SANCTIONS_SCREENING
+  PEP_SCREENING
+  ADVERSE_MEDIA_SCREENING
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+  REQUIRES_RESUBMISSION
+}
+
+enum AccreditationStatusType {
+  NOT_VERIFIED
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum AccreditationType {
+  INCOME_TEST         // $200k individual or $300k joint
+  NET_WORTH_TEST      // $1M excluding primary residence
+  PROFESSIONAL_CREDENTIAL  // Series 7, 65, 82 licenses
+  ENTITY_OWNED        // Owned by accredited investors
+  QUALIFIED_PURCHASER // $5M+ in investments
+}
+
+enum DocumentType {
+  PASSPORT
+  DRIVERS_LICENSE
+  NATIONAL_ID
+  PROOF_OF_ADDRESS
+  BANK_STATEMENT
+  TAX_RETURN
+  W2
+  INVESTMENT_ACCOUNT_STATEMENT
+  PROFESSIONAL_LICENSE
+  OTHER
+}

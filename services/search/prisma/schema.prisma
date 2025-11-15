@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SearchIndex {
+  id          String       @id @default(uuid())
+  entityType  String       @map("entity_type")
+  entityId    String       @map("entity_id")
+  
+  title       String
+  description String?      @db.Text
+  content     String       @db.Text
+  metadata    Json
+  
+  tags        String[]
+  category    String?
+  
+  searchVector String?     @map("search_vector") @db.Text
+  
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  
+  @@map("search_index")
+  @@unique([entityType, entityId])
+  @@index([entityType])
+}
+
+model SearchQuery {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  
+  query       String
+  filters     Json?
+  results     Int
+  
+  executedAt  DateTime @default(now()) @map("executed_at")
+  
+  @@map("search_queries")
+  @@index([userId])
+  @@index([executedAt])
+}

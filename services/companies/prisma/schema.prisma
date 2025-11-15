@@ -1,0 +1,315 @@
+// Companies & Securities Service Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================
+// Company Models
+// ====================
+
+model Company {
+  id                String            @id @default(uuid())
+  name              String
+  legalName         String            @map("legal_name")
+  ein               String?           @unique // Employer Identification Number
+  incorporationDate DateTime?         @map("incorporation_date")
+  jurisdiction      String?           // State/country of incorporation
+  businessType      BusinessType      @map("business_type")
+  industry          String?
+  sector            String?
+  description       String?           @db.Text
+  website           String?
+  logoUrl           String?           @map("logo_url")
+  status            CompanyStatus     @default(ACTIVE)
+  
+  // Address
+  street            String?
+  city              String?
+  state             String?
+  zipCode           String?           @map("zip_code")
+  country           String            @default("US")
+  
+  // Metadata
+  metadata          Json?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  securityClasses   SecurityClass[]
+  corporateActions  CorporateAction[]
+  valuations        CompanyValuation[]
+  contacts          CompanyContact[]
+  
+  @@map("companies")
+  @@index([status])
+  @@index([businessType])
+  @@index([industry])
+}
+
+enum BusinessType {
+  C_CORP
+  S_CORP
+  LLC
+  PARTNERSHIP
+  SOLE_PROPRIETORSHIP
+  NON_PROFIT
+  OTHER
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  ACQUIRED
+  IPO
+  BANKRUPT
+  DISSOLVED
+}
+
+// ====================
+// Security Class Models
+// ====================
+
+model SecurityClass {
+  id                    String                @id @default(uuid())
+  companyId             String                @map("company_id")
+  name                  String                // e.g., "Series A Preferred Stock"
+  classType             SecurityClassType     @map("class_type")
+  
+  // Terms
+  parValue              Decimal?              @map("par_value") @db.Decimal(18, 8)
+  authorizedShares      Decimal               @map("authorized_shares") @db.Decimal(18, 4)
+  issuedShares          Decimal               @default(0) @map("issued_shares") @db.Decimal(18, 4)
+  outstandingShares     Decimal               @default(0) @map("outstanding_shares") @db.Decimal(18, 4)
+  
+  // Preferred Stock Terms
+  liquidationPreference Decimal?              @map("liquidation_preference") @db.Decimal(5, 2) // e.g., 1.0x, 1.5x
+  dividendRate          Decimal?              @map("dividend_rate") @db.Decimal(5, 4) // Annual %
+  conversionRatio       Decimal?              @map("conversion_ratio") @db.Decimal(10, 4)
+  votingRights          Boolean               @default(true) @map("voting_rights")
+  participatingRights   Boolean               @default(false) @map("participating_rights")
+  
+  // Metadata
+  issuanceDate          DateTime?             @map("issuance_date")
+  description           String?               @db.Text
+  metadata              Json?
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+  
+  // Relations
+  company               Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  instruments           SecurityInstrument[]
+  
+  @@map("security_classes")
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([classType])
+}
+
+enum SecurityClassType {
+  COMMON_STOCK
+  PREFERRED_STOCK
+  CONVERTIBLE_NOTE
+  SAFE
+  WARRANT
+  OPTION
+  UNITS
+  OTHER
+}
+
+// ====================
+// Security Instrument Models
+// ====================
+
+model SecurityInstrument {
+  id                String            @id @default(uuid())
+  securityClassId   String            @map("security_class_id")
+  certificateNumber String?           @unique @map("certificate_number")
+  
+  // Instrument Details
+  holderUserId      String?           @map("holder_user_id") // Reference to identity service
+  holderName        String?           @map("holder_name") // For legacy/non-user holders
+  sharesOwned       Decimal           @map("shares_owned") @db.Decimal(18, 4)
+  purchasePrice     Decimal?          @map("purchase_price") @db.Decimal(18, 8)
+  purchaseDate      DateTime?         @map("purchase_date")
+  
+  // Status
+  status            InstrumentStatus  @default(ACTIVE)
+  isRestricted      Boolean           @default(true) @map("is_restricted")
+  restrictionEndDate DateTime?        @map("restriction_end_date")
+  
+  // Metadata
+  notes             String?           @db.Text
+  metadata          Json?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  securityClass     SecurityClass     @relation(fields: [securityClassId], references: [id], onDelete: Cascade)
+  
+  @@map("security_instruments")
+  @@index([securityClassId])
+  @@index([holderUserId])
+  @@index([status])
+}
+
+enum InstrumentStatus {
+  ACTIVE
+  TRANSFERRED
+  CONVERTED
+  EXERCISED
+  CANCELLED
+  EXPIRED
+}
+
+// ====================
+// Corporate Actions
+// ====================
+
+model CorporateAction {
+  id              String              @id @default(uuid())
+  companyId       String              @map("company_id")
+  actionType      CorporateActionType @map("action_type")
+  
+  // Action Details
+  effectiveDate   DateTime            @map("effective_date")
+  announcedDate   DateTime            @map("announced_date")
+  recordDate      DateTime?           @map("record_date")
+  
+  // Split/Reverse Split
+  splitRatio      Decimal?            @map("split_ratio") @db.Decimal(10, 4) // e.g., 2.0 for 2-for-1 split
+  
+  // Dividend
+  dividendAmount  Decimal?            @map("dividend_amount") @db.Decimal(18, 8)
+  
+  // Metadata
+  description     String              @db.Text
+  status          ActionStatus        @default(PENDING)
+  metadata        Json?
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  
+  // Relations
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@map("corporate_actions")
+  @@index([companyId])
+  @@index([actionType])
+  @@index([effectiveDate])
+}
+
+enum CorporateActionType {
+  STOCK_SPLIT
+  REVERSE_SPLIT
+  DIVIDEND
+  STOCK_DIVIDEND
+  RIGHTS_ISSUE
+  MERGER
+  ACQUISITION
+  SPINOFF
+  NAME_CHANGE
+  TICKER_CHANGE
+  OTHER
+}
+
+enum ActionStatus {
+  PENDING
+  APPROVED
+  EXECUTED
+  CANCELLED
+}
+
+// ====================
+// Valuation History
+// ====================
+
+model CompanyValuation {
+  id              String          @id @default(uuid())
+  companyId       String          @map("company_id")
+  
+  // Valuation Details
+  valuationDate   DateTime        @map("valuation_date")
+  pricePerShare   Decimal         @map("price_per_share") @db.Decimal(18, 8)
+  totalValuation  Decimal         @map("total_valuation") @db.Decimal(18, 2)
+  
+  // Source
+  valuationType   ValuationType   @map("valuation_type")
+  source          String?         // e.g., "409A Valuation", "Series B Fundraise"
+  
+  // Metadata
+  notes           String?         @db.Text
+  metadata        Json?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  
+  // Relations
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@map("company_valuations")
+  @@index([companyId])
+  @@index([valuationDate])
+}
+
+enum ValuationType {
+  FUNDRAISE
+  VALUATION_409A
+  SECONDARY_SALE
+  ACQUISITION_OFFER
+  MARKET_ESTIMATE
+  INTERNAL
+  OTHER
+}
+
+// ====================
+// Company Contacts
+// ====================
+
+model CompanyContact {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  
+  // Contact Details
+  userId      String?  @map("user_id") // Reference to identity service
+  role        String   // e.g., "CEO", "CFO", "IR Contact"
+  name        String
+  title       String?
+  email       String?
+  phone       String?
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  
+  // Metadata
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@map("company_contacts")
+  @@index([companyId])
+  @@index([userId])
+}
+
+// ====================
+// Audit Log
+// ====================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type") // Company, SecurityClass, etc.
+  entityId    String   @map("entity_id")
+  action      String   // CREATE, UPDATE, DELETE
+  userId      String?  @map("user_id")
+  changes     Json?    // Before/after changes
+  metadata    Json?
+  timestamp   DateTime @default(now())
+  
+  @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
+}

@@ -1,0 +1,52 @@
+{
+  "name": "private-assets-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise marketplace for private company securities with direct indexing",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "type-check": "pnpm -r type-check",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "dev:identity": "pnpm --filter @platform/identity-service dev",
+    "dev:profiles": "pnpm --filter @platform/profiles-service dev",
+    "dev:companies": "pnpm --filter @platform/companies-service dev",
+    "dev:holdings": "pnpm --filter @platform/holdings-service dev",
+    "dev:marketplace": "pnpm --filter @platform/marketplace-service dev",
+    "dev:deals": "pnpm --filter @platform/deals-service dev",
+    "dev:documents": "pnpm --filter @platform/documents-service dev",
+    "dev:payments": "pnpm --filter @platform/payments-service dev",
+    "dev:pricing": "pnpm --filter @platform/pricing-service dev",
+    "dev:search": "pnpm --filter @platform/search-service dev",
+    "dev:analytics": "pnpm --filter @platform/analytics-service dev",
+    "dev:notifications": "pnpm --filter @platform/notifications-service dev",
+    "dev:admin": "pnpm --filter @platform/admin-service dev",
+    "dev:web": "pnpm --filter @platform/web-app dev",
+    "dev:admin-console": "pnpm --filter @platform/admin-console dev",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "db:migrate": "pnpm -r --filter \"@platform/*-service\" prisma:migrate",
+    "db:generate": "pnpm -r --filter \"@platform/*-service\" prisma:generate",
+    "db:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "turbo": "^1.12.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

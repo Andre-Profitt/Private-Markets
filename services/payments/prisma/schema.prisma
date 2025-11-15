@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  
+  amount          Decimal       @db.Decimal(18, 2)
+  currency        String        @default("USD")
+  
+  paymentType     PaymentType   @map("payment_type")
+  paymentMethod   String        @map("payment_method")
+  status          PaymentStatus @default(PENDING)
+  
+  referenceId     String?       @map("reference_id")
+  externalId      String?       @map("external_id")
+  
+  processedAt     DateTime?     @map("processed_at")
+  settledAt       DateTime?     @map("settled_at")
+  
+  metadata        Json?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  
+  @@map("payments")
+  @@index([userId])
+  @@index([status])
+}
+
+enum PaymentType {
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT
+  DISTRIBUTION
+  FEE
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model BankAccount {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  
+  accountName   String   @map("account_name")
+  accountNumber String   @map("account_number")
+  routingNumber String   @map("routing_number")
+  bankName      String   @map("bank_name")
+  
+  isVerified    Boolean  @default(false) @map("is_verified")
+  isPrimary     Boolean  @default(false) @map("is_primary")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  @@map("bank_accounts")
+  @@index([userId])
+}

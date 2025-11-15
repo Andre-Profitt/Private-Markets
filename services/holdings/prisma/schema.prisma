@@ -1,0 +1,258 @@
+// Holdings & Positions Service Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================
+// Holdings Models
+// ====================
+
+model Holding {
+  id                String          @id @default(uuid())
+  userId            String          @map("user_id") // Reference to identity service
+  companyId         String          @map("company_id") // Reference to companies service
+  securityClassId   String          @map("security_class_id") // Reference to companies service
+  
+  // Holding Details
+  sharesOwned       Decimal         @map("shares_owned") @db.Decimal(18, 4)
+  costBasis         Decimal?        @map("cost_basis") @db.Decimal(18, 8) // Average cost per share
+  totalCost         Decimal?        @map("total_cost") @db.Decimal(18, 2) // Total amount invested
+  
+  // Acquisition
+  acquisitionDate   DateTime        @map("acquisition_date")
+  acquisitionMethod AcquisitionMethod @map("acquisition_method")
+  
+  // Status
+  status            HoldingStatus   @default(ACTIVE)
+  isRestricted      Boolean         @default(true) @map("is_restricted")
+  restrictionEndDate DateTime?      @map("restriction_end_date")
+  
+  // Metadata
+  notes             String?         @db.Text
+  metadata          Json?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  
+  // Relations
+  transactions      Transaction[]
+  
+  @@map("holdings")
+  @@unique([userId, companyId, securityClassId, acquisitionDate])
+  @@index([userId])
+  @@index([companyId])
+  @@index([securityClassId])
+  @@index([status])
+}
+
+enum AcquisitionMethod {
+  PURCHASE
+  GRANT
+  EXERCISE
+  TRANSFER
+  CONVERSION
+  DIVIDEND
+  OTHER
+}
+
+enum HoldingStatus {
+  ACTIVE
+  SOLD
+  TRANSFERRED
+  CANCELLED
+  EXPIRED
+}
+
+// ====================
+// Transaction Models
+// ====================
+
+model Transaction {
+  id                String            @id @default(uuid())
+  userId            String            @map("user_id")
+  holdingId         String?           @map("holding_id")
+  companyId         String            @map("company_id")
+  securityClassId   String            @map("security_class_id")
+  
+  // Transaction Details
+  transactionType   TransactionType   @map("transaction_type")
+  transactionDate   DateTime          @map("transaction_date")
+  settlementDate    DateTime?         @map("settlement_date")
+  
+  // Quantities and Pricing
+  shares            Decimal           @db.Decimal(18, 4)
+  pricePerShare     Decimal?          @map("price_per_share") @db.Decimal(18, 8)
+  totalAmount       Decimal?          @map("total_amount") @db.Decimal(18, 2)
+  fees              Decimal?          @default(0) @db.Decimal(18, 2)
+  
+  // Status
+  status            TransactionStatus @default(PENDING)
+  
+  // References
+  orderId           String?           @map("order_id") // Reference to marketplace order
+  counterpartyUserId String?          @map("counterparty_user_id")
+  
+  // Metadata
+  notes             String?           @db.Text
+  metadata          Json?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  holding           Holding?          @relation(fields: [holdingId], references: [id])
+  
+  @@map("transactions")
+  @@index([userId])
+  @@index([holdingId])
+  @@index([companyId])
+  @@index([transactionType])
+  @@index([transactionDate])
+  @@index([status])
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  TRANSFER_IN
+  TRANSFER_OUT
+  GRANT
+  EXERCISE
+  CONVERSION
+  SPLIT
+  DIVIDEND
+  CANCELLATION
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  SETTLED
+  CANCELLED
+  FAILED
+}
+
+// ====================
+// Portfolio Snapshot
+// ====================
+
+model PortfolioSnapshot {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  
+  // Snapshot Details
+  snapshotDate    DateTime @map("snapshot_date")
+  totalValue      Decimal  @map("total_value") @db.Decimal(18, 2)
+  totalCost       Decimal  @map("total_cost") @db.Decimal(18, 2)
+  unrealizedGain  Decimal  @map("unrealized_gain") @db.Decimal(18, 2)
+  realizedGain    Decimal  @map("realized_gain") @db.Decimal(18, 2)
+  
+  // Holdings breakdown (JSON)
+  holdingsSummary Json     @map("holdings_summary")
+  
+  // Metadata
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("portfolio_snapshots")
+  @@unique([userId, snapshotDate])
+  @@index([userId])
+  @@index([snapshotDate])
+}
+
+// ====================
+// Position Models (Aggregated View)
+// ====================
+
+model Position {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  companyId         String   @map("company_id")
+  securityClassId   String   @map("security_class_id")
+  
+  // Aggregated Position
+  totalShares       Decimal  @map("total_shares") @db.Decimal(18, 4)
+  averageCost       Decimal  @map("average_cost") @db.Decimal(18, 8)
+  totalCost         Decimal  @map("total_cost") @db.Decimal(18, 2)
+  
+  // Valuation
+  currentPrice      Decimal? @map("current_price") @db.Decimal(18, 8)
+  currentValue      Decimal? @map("current_value") @db.Decimal(18, 2)
+  unrealizedGain    Decimal? @map("unrealized_gain") @db.Decimal(18, 2)
+  unrealizedGainPct Decimal? @map("unrealized_gain_pct") @db.Decimal(10, 4)
+  
+  // Dates
+  firstAcquired     DateTime @map("first_acquired")
+  lastUpdated       DateTime @default(now()) @map("last_updated") @updatedAt
+  
+  @@map("positions")
+  @@unique([userId, companyId, securityClassId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+// ====================
+// Transfer Requests
+// ====================
+
+model TransferRequest {
+  id                String          @id @default(uuid())
+  fromUserId        String          @map("from_user_id")
+  toUserId          String          @map("to_user_id")
+  holdingId         String          @map("holding_id")
+  
+  // Transfer Details
+  shares            Decimal         @db.Decimal(18, 4)
+  reason            String?
+  
+  // Status
+  status            TransferStatus  @default(PENDING)
+  requestedAt       DateTime        @default(now()) @map("requested_at")
+  approvedAt        DateTime?       @map("approved_at")
+  completedAt       DateTime?       @map("completed_at")
+  rejectedAt        DateTime?       @map("rejected_at")
+  
+  // Approval
+  approvedBy        String?         @map("approved_by") // Admin user ID
+  rejectionReason   String?         @map("rejection_reason")
+  
+  // Metadata
+  metadata          Json?
+  
+  @@map("transfer_requests")
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+// ====================
+// Audit Log
+// ====================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  action      String
+  userId      String?  @map("user_id")
+  changes     Json?
+  metadata    Json?
+  timestamp   DateTime @default(now())
+  
+  @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
+}

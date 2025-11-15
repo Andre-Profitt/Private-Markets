@@ -1,0 +1,240 @@
+// Marketplace Service Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================
+// Order Models
+// ====================
+
+model Order {
+  id                String        @id @default(uuid())
+  userId            String        @map("user_id")
+  companyId         String        @map("company_id")
+  securityClassId   String        @map("security_class_id")
+  
+  // Order Details
+  orderType         OrderType     @map("order_type")
+  side              OrderSide
+  quantity          Decimal       @db.Decimal(18, 4)
+  price             Decimal?      @db.Decimal(18, 8)
+  
+  // Order Status
+  status            OrderStatus   @default(PENDING)
+  filledQuantity    Decimal       @default(0) @map("filled_quantity") @db.Decimal(18, 4)
+  remainingQuantity Decimal       @map("remaining_quantity") @db.Decimal(18, 4)
+  
+  // Timestamps
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  expiresAt         DateTime?     @map("expires_at")
+  
+  // Execution
+  averageFillPrice  Decimal?      @map("average_fill_price") @db.Decimal(18, 8)
+  totalFees         Decimal       @default(0) @map("total_fees") @db.Decimal(18, 2)
+  
+  // Metadata
+  notes             String?       @db.Text
+  metadata          Json?
+  
+  // Relations
+  executions        Execution[]
+  
+  @@map("orders")
+  @@index([userId])
+  @@index([companyId])
+  @@index([securityClassId])
+  @@index([status])
+  @@index([side])
+  @@index([createdAt])
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_LIMIT
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderStatus {
+  PENDING
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+// ====================
+// Execution Models
+// ====================
+
+model Execution {
+  id              String    @id @default(uuid())
+  orderId         String    @map("order_id")
+  buyOrderId      String    @map("buy_order_id")
+  sellOrderId     String    @map("sell_order_id")
+  
+  // Execution Details
+  quantity        Decimal   @db.Decimal(18, 4)
+  price           Decimal   @db.Decimal(18, 8)
+  totalAmount     Decimal   @map("total_amount") @db.Decimal(18, 2)
+  
+  // Fees
+  buyerFee        Decimal   @map("buyer_fee") @db.Decimal(18, 2)
+  sellerFee       Decimal   @map("seller_fee") @db.Decimal(18, 2)
+  
+  // Timestamps
+  executedAt      DateTime  @default(now()) @map("executed_at")
+  settledAt       DateTime? @map("settled_at")
+  
+  // Status
+  status          ExecutionStatus @default(PENDING)
+  
+  // Metadata
+  metadata        Json?
+  
+  // Relations
+  order           Order     @relation(fields: [orderId], references: [id])
+  
+  @@map("executions")
+  @@index([orderId])
+  @@index([buyOrderId])
+  @@index([sellOrderId])
+  @@index([executedAt])
+  @@index([status])
+}
+
+enum ExecutionStatus {
+  PENDING
+  SETTLED
+  FAILED
+  REVERSED
+}
+
+// ====================
+// Order Book
+// ====================
+
+model OrderBook {
+  id              String   @id @default(uuid())
+  companyId       String   @map("company_id")
+  securityClassId String   @map("security_class_id")
+  
+  // Market Data
+  bestBidPrice    Decimal? @map("best_bid_price") @db.Decimal(18, 8)
+  bestAskPrice    Decimal? @map("best_ask_price") @db.Decimal(18, 8)
+  lastTradePrice  Decimal? @map("last_trade_price") @db.Decimal(18, 8)
+  
+  // Volume
+  bidVolume       Decimal  @default(0) @map("bid_volume") @db.Decimal(18, 4)
+  askVolume       Decimal  @default(0) @map("ask_volume") @db.Decimal(18, 4)
+  dailyVolume     Decimal  @default(0) @map("daily_volume") @db.Decimal(18, 4)
+  
+  // Timestamps
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@map("order_books")
+  @@unique([companyId, securityClassId])
+  @@index([companyId])
+}
+
+// ====================
+// Market Data
+// ====================
+
+model Trade {
+  id              String   @id @default(uuid())
+  executionId     String   @map("execution_id")
+  companyId       String   @map("company_id")
+  securityClassId String   @map("security_class_id")
+  
+  // Trade Details
+  price           Decimal  @db.Decimal(18, 8)
+  quantity        Decimal  @db.Decimal(18, 4)
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(18, 2)
+  
+  // Timestamp
+  tradedAt        DateTime @default(now()) @map("traded_at")
+  
+  @@map("trades")
+  @@index([companyId, securityClassId])
+  @@index([tradedAt])
+}
+
+// ====================
+// Settlement
+// ====================
+
+model Settlement {
+  id              String           @id @default(uuid())
+  executionId     String           @map("execution_id")
+  
+  // Parties
+  buyerUserId     String           @map("buyer_user_id")
+  sellerUserId    String           @map("seller_user_id")
+  
+  // Settlement Details
+  quantity        Decimal          @db.Decimal(18, 4)
+  amount          Decimal          @db.Decimal(18, 2)
+  
+  // Status
+  status          SettlementStatus @default(PENDING)
+  
+  // Timestamps
+  initiatedAt     DateTime         @default(now()) @map("initiated_at")
+  completedAt     DateTime?        @map("completed_at")
+  failedAt        DateTime?        @map("failed_at")
+  
+  // Failure
+  failureReason   String?          @map("failure_reason")
+  
+  // Metadata
+  metadata        Json?
+  
+  @@map("settlements")
+  @@index([executionId])
+  @@index([buyerUserId])
+  @@index([sellerUserId])
+  @@index([status])
+}
+
+enum SettlementStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+// ====================
+// Audit Log
+// ====================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  action      String
+  userId      String?  @map("user_id")
+  changes     Json?
+  metadata    Json?
+  timestamp   DateTime @default(now())
+  
+  @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
+}

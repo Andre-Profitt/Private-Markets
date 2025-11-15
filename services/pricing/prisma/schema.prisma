@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SecurityPrice {
+  id              String          @id @default(uuid())
+  companyId       String          @map("company_id")
+  securityClassId String          @map("security_class_id")
+  
+  price           Decimal         @db.Decimal(18, 8)
+  priceDate       DateTime        @map("price_date")
+  
+  source          PriceSource
+  methodology     String?
+  
+  marketCap       Decimal?        @map("market_cap") @db.Decimal(18, 2)
+  volume          Decimal?        @db.Decimal(18, 4)
+  
+  metadata        Json?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  
+  @@map("security_prices")
+  @@unique([companyId, securityClassId, priceDate])
+  @@index([companyId])
+  @@index([priceDate])
+}
+
+enum PriceSource {
+  TRADE
+  VALUATION_409A
+  FUNDRAISE
+  APPRAISAL
+  MARKET_DATA
+  MODEL
+}
+
+model ValuationModel {
+  id              String          @id @default(uuid())
+  companyId       String          @map("company_id")
+  securityClassId String          @map("security_class_id")
+  
+  modelType       ValuationType   @map("model_type")
+  parameters      Json
+  
+  calculatedPrice Decimal         @map("calculated_price") @db.Decimal(18, 8)
+  confidence      Decimal?        @db.Decimal(5, 4)
+  
+  calculatedAt    DateTime        @default(now()) @map("calculated_at")
+  validUntil      DateTime?       @map("valid_until")
+  
+  @@map("valuation_models")
+  @@index([companyId])
+}
+
+enum ValuationType {
+  DCF
+  COMPARABLE_COMPANY
+  PRECEDENT_TRANSACTION
+  VENTURE_CAPITAL
+  OPTION_PRICING
+  HYBRID
+}
+
+model FairValueMeasurement {
+  id              String          @id @default(uuid())
+  companyId       String          @map("company_id")
+  securityClassId String          @map("security_class_id")
+  
+  fairValue       Decimal         @map("fair_value") @db.Decimal(18, 8)
+  measurementDate DateTime        @map("measurement_date")
+  
+  level           FairValueLevel
+  inputs          Json
+  
+  valuerId        String?         @map("valuer_id")
+  reportUrl       String?         @map("report_url")
+  
+  @@map("fair_value_measurements")
+  @@index([companyId])
+  @@index([measurementDate])
+}
+
+enum FairValueLevel {
+  LEVEL_1
+  LEVEL_2
+  LEVEL_3
+}
+
+model PriceHistory {
+  id              String   @id @default(uuid())
+  companyId       String   @map("company_id")
+  securityClassId String   @map("security_class_id")
+  
+  openPrice       Decimal  @map("open_price") @db.Decimal(18, 8)
+  highPrice       Decimal  @map("high_price") @db.Decimal(18, 8)
+  lowPrice        Decimal  @map("low_price") @db.Decimal(18, 8)
+  closePrice      Decimal  @map("close_price") @db.Decimal(18, 8)
+  
+  volume          Decimal  @db.Decimal(18, 4)
+  
+  periodStart     DateTime @map("period_start")
+  periodEnd       DateTime @map("period_end")
+  
+  @@map("price_history")
+  @@unique([companyId, securityClassId, periodStart])
+}

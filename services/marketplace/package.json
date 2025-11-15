@@ -1,0 +1,32 @@
+{
+  "name": "@platform/marketplace-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Marketplace listings, orders, and trade matching",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main",
+    "test": "jest",
+    "lint": "eslint \"{src,test}/**/*.ts\""
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/swagger": "^7.2.0",
+    "@nestjs/config": "^3.1.1",
+    "@nestjs/microservices": "^10.3.0",
+    "@prisma/client": "^5.9.0",
+    "kafkajs": "^2.2.4",
+    "class-validator": "^0.14.1",
+    "class-transformer": "^0.5.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.3.0",
+    "@nestjs/testing": "^10.3.0",
+    "typescript": "^5.3.3",
+    "prisma": "^5.9.0"
+  }
+}
