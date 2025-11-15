@@ -23,36 +23,56 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
+    // Validate seller/buyer specific fields
+    if (registerDto.userType === 'SELLER' && !registerDto.company) {
+      throw new BadRequestException('Company is required for sellers');
+    }
+    if (registerDto.userType === 'BUYER' && !registerDto.investorType) {
+      throw new BadRequestException('Investor type is required for buyers');
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(registerDto.password, 10);
 
-    // Create user
+    // Create user with new fields
     const user = await this.prisma.user.create({
       data: {
         email: registerDto.email,
         passwordHash,
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
+        userType: registerDto.userType,
+        phone: registerDto.phone,
+        country: registerDto.country,
+        company: registerDto.userType === 'SELLER' ? registerDto.company : null,
+        investorType: registerDto.userType === 'BUYER' ? registerDto.investorType : null,
         status: 'PENDING_VERIFICATION',
       },
     });
 
-    // Assign default INVESTOR role
-    const investorRole = await this.prisma.role.findUnique({
-      where: { name: 'INVESTOR' },
+    // Assign role based on userType (for backwards compatibility)
+    const roleMapping = {
+      'SELLER': 'INVESTOR', // Using existing INVESTOR role for now
+      'BUYER': 'INVESTOR',
+      'ADMIN': 'ADMIN'
+    };
+
+    const roleName = roleMapping[registerDto.userType];
+    const role = await this.prisma.role.findUnique({
+      where: { name: roleName },
     });
 
-    if (investorRole) {
+    if (role) {
       await this.prisma.userRole.create({
         data: {
           userId: user.id,
-          roleId: investorRole.id,
+          roleId: role.id,
         },
       });
     }
 
     // Generate tokens
-    return this.generateTokens(user.id, user.email, ['INVESTOR']);
+    return this.generateTokens(user.id, user.email, [roleName]);
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
@@ -176,6 +196,11 @@ export class AuthService {
         email: true,
         firstName: true,
         lastName: true,
+        userType: true,
+        phone: true,
+        country: true,
+        company: true,
+        investorType: true,
         status: true,
         emailVerified: true,
         mfaEnabled: true,

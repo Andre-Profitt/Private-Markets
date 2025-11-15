@@ -1,6 +1,7 @@
+// Deal Service - MVP Schema
+
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma-client"
 }
 
 datasource db {
@@ -8,80 +9,149 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ====================
+// Deal Model - Simplified for MVP
+// ====================
+
 model Deal {
-  id              String      @id @default(uuid())
-  companyId       String      @map("company_id")
-  securityClassId String      @map("security_class_id")
-  
-  name            String
-  description     String      @db.Text
-  dealType        DealType    @map("deal_type")
-  status          DealStatus  @default(DRAFT)
-  
-  targetAmount    Decimal     @map("target_amount") @db.Decimal(18, 2)
-  minInvestment   Decimal     @map("min_investment") @db.Decimal(18, 2)
-  maxInvestment   Decimal?    @map("max_investment") @db.Decimal(18, 2)
-  pricePerShare   Decimal     @map("price_per_share") @db.Decimal(18, 8)
-  
-  raisedAmount    Decimal     @default(0) @map("raised_amount") @db.Decimal(18, 2)
-  investorCount   Int         @default(0) @map("investor_count")
-  
-  startDate       DateTime    @map("start_date")
-  endDate         DateTime    @map("end_date")
-  
-  terms           Json?
-  metadata        Json?
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
-  
-  investments     Investment[]
-  
+  id            String   @id @default(uuid())
+  companyId     String   @map("company_id")
+
+  // Deal basics
+  name          String   // e.g., "Q4 2024 Liquidity Program"
+  targetSize    Decimal  @map("target_size") @db.Decimal(18, 2) // Total $ target
+  minTicket     Decimal  @map("min_ticket") @db.Decimal(18, 2)  // Minimum buy-in
+  pricePerShare Decimal? @map("price_per_share") @db.Decimal(18, 8) // Can be set later
+
+  // Timeline
+  openDate      DateTime @map("open_date")
+  commitDeadline DateTime @map("commit_deadline")
+  closeDate     DateTime @map("close_date")
+
+  // Status
+  status        DealStatus @default(DRAFT)
+
+  // Stats (computed)
+  totalSupply   Int?     @map("total_supply")  // Total shares offered
+  totalDemand   Decimal? @map("total_demand") @db.Decimal(18, 2) // Total $ committed
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  sellerParticipations SellerParticipation[]
+  buyerCommitments    BuyerCommitment[]
+
   @@map("deals")
   @@index([companyId])
   @@index([status])
 }
 
-enum DealType {
-  EQUITY
-  CONVERTIBLE_NOTE
-  SAFE
-  REVENUE_SHARE
-}
-
 enum DealStatus {
   DRAFT
   OPEN
-  CLOSED
-  CANCELLED
-  FULLY_SUBSCRIBED
+  ALLOCATING
+  CLOSING
+  COMPLETE
 }
 
-model Investment {
-  id            String          @id @default(uuid())
-  dealId        String          @map("deal_id")
-  userId        String          @map("user_id")
-  
-  amount        Decimal         @db.Decimal(18, 2)
-  shares        Decimal         @db.Decimal(18, 4)
-  status        InvestmentStatus @default(PENDING)
-  
-  committedAt   DateTime        @default(now()) @map("committed_at")
-  completedAt   DateTime?       @map("completed_at")
-  
-  deal          Deal            @relation(fields: [dealId], references: [id])
-  
-  @@map("investments")
+// ====================
+// Seller Participation
+// ====================
+
+model SellerParticipation {
+  id            String   @id @default(uuid())
+  dealId        String   @map("deal_id")
+  userId        String   @map("user_id")
+  holdingId     String   @map("holding_id") // Reference to Holdings service
+
+  // What they want to sell
+  sharesToSell  Int      @map("shares_to_sell")
+  minimumPrice  Decimal? @map("minimum_price") @db.Decimal(18, 8) // Optional
+
+  // Admin controls
+  status        ParticipationStatus @default(SUBMITTED)
+  approvedShares Int?    @map("approved_shares") // Admin can adjust
+  approvedBy    String?  @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+
+  // Metadata
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  deal          Deal     @relation(fields: [dealId], references: [id])
+
+  @@map("seller_participations")
   @@index([dealId])
   @@index([userId])
+  @@index([status])
 }
 
-enum InvestmentStatus {
-  PENDING
+enum ParticipationStatus {
+  SUBMITTED
+  VERIFIED
   APPROVED
-  COMPLETED
   REJECTED
-  CANCELLED
+  WITHDRAWN
 }
+
+// ====================
+// Buyer Commitment
+// ====================
+
+model BuyerCommitment {
+  id                String   @id @default(uuid())
+  dealId            String   @map("deal_id")
+  userId            String   @map("user_id")
+
+  // What they want to buy
+  commitmentAmount  Decimal  @map("commitment_amount") @db.Decimal(18, 2)
+
+  // Admin controls
+  status           CommitmentStatus @default(SUBMITTED)
+  allocatedAmount  Decimal? @map("allocated_amount") @db.Decimal(18, 2) // Set by admin
+  allocatedBy      String?  @map("allocated_by")
+  allocatedAt      DateTime? @map("allocated_at")
+
+  // Payment tracking
+  paymentStatus    PaymentStatus @default(PENDING) @map("payment_status")
+  paymentReference String? @map("payment_reference")
+  paidAt           DateTime? @map("paid_at")
+
+  // Metadata
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  deal             Deal     @relation(fields: [dealId], references: [id])
+
+  @@map("buyer_commitments")
+  @@index([dealId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum CommitmentStatus {
+  SUBMITTED
+  APPROVED
+  ALLOCATED
+  REJECTED
+  WITHDRAWN
+}
+
+enum PaymentStatus {
+  PENDING
+  WIRED
+  CONFIRMED
+  REFUNDED
+}
+
+// ====================
+// Audit Log
+// ====================
 
 model AuditLog {
   id          String   @id @default(uuid())
@@ -89,7 +159,12 @@ model AuditLog {
   entityId    String   @map("entity_id")
   action      String
   userId      String?  @map("user_id")
+  changes     Json?
+  metadata    Json?
   timestamp   DateTime @default(now())
-  
+
   @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
 }

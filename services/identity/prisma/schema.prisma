@@ -13,6 +13,16 @@ model User {
   passwordHash  String   @map("password_hash")
   firstName     String?  @map("first_name")
   lastName      String?  @map("last_name")
+  userType      UserType @default(BUYER) @map("user_type")
+  phone         String?
+  country       String?
+
+  // Seller-specific fields
+  company       String?  // Company they work(ed) at
+
+  // Buyer-specific fields
+  investorType  InvestorType? @map("investor_type")
+
   status        UserStatus @default(ACTIVE)
   emailVerified Boolean  @default(false) @map("email_verified")
   mfaEnabled    Boolean  @default(false) @map("mfa_enabled")
@@ -30,6 +40,7 @@ model User {
   @@map("users")
   @@index([email])
   @@index([tenantId])
+  @@index([userType])
 }
 
 model Role {
@@ -115,4 +126,16 @@ enum UserStatus {
   INACTIVE
   SUSPENDED
   PENDING_VERIFICATION
+}
+
+enum UserType {
+  SELLER
+  BUYER
+  ADMIN
+}
+
+enum InvestorType {
+  INDIVIDUAL
+  FAMILY_OFFICE
+  FUND
 }

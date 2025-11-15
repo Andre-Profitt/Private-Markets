@@ -8,6 +8,11 @@ interface User {
   email: string;
   firstName?: string;
   lastName?: string;
+  userType: 'SELLER' | 'BUYER' | 'ADMIN';
+  phone?: string;
+  country?: string;
+  company?: string;
+  investorType?: 'INDIVIDUAL' | 'FAMILY_OFFICE' | 'FUND';
   roles: string[];
 }
 
@@ -21,6 +26,11 @@ interface AuthContextType {
     password: string;
     firstName?: string;
     lastName?: string;
+    userType: 'SELLER' | 'BUYER' | 'ADMIN';
+    phone?: string;
+    country?: string;
+    company?: string;
+    investorType?: 'INDIVIDUAL' | 'FAMILY_OFFICE' | 'FUND';
   }) => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
@@ -80,13 +90,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string;
     firstName?: string;
     lastName?: string;
+    userType: 'SELLER' | 'BUYER' | 'ADMIN';
+    phone?: string;
+    country?: string;
+    company?: string;
+    investorType?: 'INDIVIDUAL' | 'FAMILY_OFFICE' | 'FUND';
   }) => {
     try {
       const response = await apiClient.register(data);
-      
+
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
-      
+
       setAccessToken(response.accessToken);
       setUser(response.user);
     } catch (error) {
